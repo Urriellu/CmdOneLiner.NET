@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>CmdOneLinerNET</RootNamespace>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Adrian B. [Urriellu]</Authors>
+    <Company />
+    <Description>Easily execute command-line applications from .NET code in a single line of code.</Description>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/Urriellu/CmdOneLiner.NET</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Urriellu/CmdOneLiner.NET</RepositoryUrl>
+    <PackageTags>command line, cmd, oneliner, windows, linux, console</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>CmdOneLiner.NET.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+    <None Include="..\README.md" Link="README.md" />
+  </ItemGroup>
+
+</Project>
