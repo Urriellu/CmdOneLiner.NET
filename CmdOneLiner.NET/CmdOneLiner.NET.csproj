@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFrameworks>netstandard2.1;netcoreapp3.1;net5.0;net6.0</TargetFrameworks>
     <RootNamespace>CmdOneLinerNET</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>Adrian B. [Urriellu]</Authors>
@@ -11,6 +11,9 @@
     <PackageProjectUrl>https://github.com/Urriellu/CmdOneLiner.NET</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Urriellu/CmdOneLiner.NET</RepositoryUrl>
     <PackageTags>command line, cmd, oneliner, windows, linux, console</PackageTags>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
