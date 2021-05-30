@@ -2,6 +2,8 @@
 
 CmdOneLiner.NET easily executes command-line applications from .NET in a single line of code.
 
+[![NuGet version (CmdOneLiner.NET)](https://img.shields.io/nuget/v/CmdOneLiner.NET?style=flat-square)](https://www.nuget.org/packages/CmdOneLiner.NET/)
+
 ## Usage
 
 ```C#
