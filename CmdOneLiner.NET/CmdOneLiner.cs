@@ -44,9 +44,9 @@ namespace CmdOneLinerNET
 
             bool killed = false;
 
-            canceltoken?.Register(() =>
+            CancellationTokenRegistration? cancelTokenRegistration = canceltoken?.Register(() =>
             {
-                if (!p.HasExited)
+                if (p != null && !p.HasExited)
                 {
                     killed = true;
                     try { p.Kill(); }
@@ -66,35 +66,42 @@ namespace CmdOneLinerNET
             TimeSpan upt = TimeSpan.Zero;
             TimeSpan tpt = TimeSpan.Zero;
             Task.Factory.StartNew(() =>
-            {
-                Thread.CurrentThread.Name = $"{nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
-                Stopwatch runningfor = Stopwatch.StartNew();
-
-                try
                 {
-                    while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
+                    Thread.CurrentThread.Name = $"{nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
+                    Stopwatch runningfor = Stopwatch.StartNew();
+
+                    try
+                    {
+                        while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
+                        {
+                            p.Refresh();
+                            maxmem = p.PeakWorkingSet64;
+                            if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
+                            if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
+                        }
+                        if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
+                        else Task.Delay(100).Wait();
+                    }
+                    catch { }
+                });
+
+            try
+            {
+                if (p.WaitForExit(timeoutms) && outputWaitHandle.WaitOne(timeoutms) && errorWaitHandle.WaitOne(timeoutms))
+                {
+                    if (killed) return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process killed.", maxmem, upt, tpt);
+                    else
                     {
                         p.Refresh();
-                        maxmem = p.PeakWorkingSet64;
-                        if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
-                        if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
+                        return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt);
                     }
-                    if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
-                    else Task.Delay(100).Wait();
                 }
-                catch { }
-            });
-
-            if (p.WaitForExit(timeoutms) && outputWaitHandle.WaitOne(timeoutms) && errorWaitHandle.WaitOne(timeoutms))
-            {
-                if (killed) return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process killed.", maxmem, upt, tpt);
-                else
-                {
-                    p.Refresh();
-                    return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt);
-                }
+                else return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process timed out.", maxmem, upt, tpt);
             }
-            else return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process timed out.", maxmem, upt, tpt);
+            finally
+            {
+                cancelTokenRegistration?.Dispose();
+            }
         }
     }
 }
