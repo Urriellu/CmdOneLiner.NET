@@ -11,9 +11,9 @@
     <PackageProjectUrl>https://github.com/Urriellu/CmdOneLiner.NET</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Urriellu/CmdOneLiner.NET</RepositoryUrl>
     <PackageTags>command line, cmd, oneliner, windows, linux, console</PackageTags>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
-    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
+    <Version>1.0.2</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
