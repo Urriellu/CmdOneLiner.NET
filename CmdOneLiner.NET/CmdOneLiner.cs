@@ -20,8 +20,13 @@ namespace CmdOneLinerNET
             using Process p = new Process();
             p.StartInfo.CreateNoWindow = true;
             p.StartInfo.FileName = cmd.Split(' ').First();
-            if (!string.IsNullOrEmpty(workingdir)) p.StartInfo.WorkingDirectory = workingdir;
-            p.StartInfo.Arguments = cmd.Substring(p.StartInfo.FileName.Length + 1);
+            if (!string.IsNullOrEmpty(workingdir))
+            {
+                if (System.IO.File.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' is actually a file, not a directory.");
+                if (!System.IO.Directory.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' does not exist.");
+                p.StartInfo.WorkingDirectory = workingdir;
+            }
+            if (cmd.Length > p.StartInfo.FileName.Length + 1) p.StartInfo.Arguments = cmd.Substring(p.StartInfo.FileName.Length + 1);
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
@@ -51,6 +56,8 @@ namespace CmdOneLinerNET
                     killed = true;
                     try { p.Kill(); }
                     catch (Exception ex) { throw new Exception($"Error while trying to kill process '{cmd}': {ex.Message}"); }
+                    try { if (!p.WaitForExit(60 * 1000)) throw new Exception($"Process '{cmd}' has not been killed after being canceled"); }
+                    catch (Exception ex) { throw new Exception($"Error while waiting after trying to kill process '{cmd}': {ex.Message}"); }
                 }
             });
 
@@ -87,11 +94,20 @@ namespace CmdOneLinerNET
 
             try
             {
-                if (p.WaitForExit(timeoutms) && outputWaitHandle.WaitOne(timeoutms) && errorWaitHandle.WaitOne(timeoutms))
+                bool exited = p.WaitForExit(timeoutms);
+                if (exited && outputWaitHandle.WaitOne(timeoutms) && errorWaitHandle.WaitOne(timeoutms))
                 {
                     if (killed) return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process killed.", maxmem, upt, tpt);
+                    else if (!exited) return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process not exited but also not killed. Unknown state.", maxmem, upt, tpt);
                     else
                     {
+                        // wait until it has actually exited. This is needed because sometimes WaitForExit returns true but the process hasn't existed and then it throws an exception when trying to read ExistCode
+                        Stopwatch sw = Stopwatch.StartNew();
+                        while (!p.HasExited)
+                        {
+                            Thread.Sleep(100);
+                            if (sw.Elapsed > TimeSpan.FromSeconds(60)) throw new Exception($".NET says that process '{cmd}' has exited and it has not been killed but after waiting for 60 seconds it is still running.");
+                        }
                         p.Refresh();
                         return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt);
                     }
