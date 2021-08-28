@@ -7,7 +7,14 @@
         <member name="T:CmdOneLinerNET.CmdOneLiner">
             <summary>Allows easily executing a command line application in one line of code.</summary>
         </member>
-        <member name="M:CmdOneLinerNET.CmdOneLiner.Run(System.String,System.String,System.Nullable{System.TimeSpan},System.Nullable{System.Threading.CancellationToken})">
+        <member name="M:CmdOneLinerNET.CmdOneLiner.Run(System.String,System.String,System.Nullable{System.TimeSpan},System.Nullable{System.Threading.CancellationToken},System.Diagnostics.ProcessPriorityClass,CmdOneLinerNET.IOPriorityClass)">
+            <summary>Execute a command-line application.</summary>
+            <param name="cmd">Command to execute, and its arguments</param>
+            <param name="workingdir">Path to working directory. If null, the current one (<see cref="P:System.Environment.CurrentDirectory"/>) will be used.</param>
+            <param name="timeout">If not null, the command will be killed after the given timeout.</param>
+            <param name="canceltoken">Optional object used to kill the process on demand.</param>
+        </member>
+        <member name="M:CmdOneLinerNET.CmdOneLiner.RunInBackground(System.String,System.Action{System.ValueTuple{System.Int32,System.Boolean,System.String,System.String,System.Int64,System.TimeSpan,System.TimeSpan}},System.String,System.Nullable{System.TimeSpan},System.Nullable{System.Threading.CancellationToken})">
             <summary>Execute a command-line application.</summary>
             <param name="cmd">Command to execute, and its arguments</param>
             <param name="workingdir">Path to working directory. If null, the current one (<see cref="P:System.Environment.CurrentDirectory"/>) will be used.</param>

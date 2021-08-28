@@ -15,7 +15,7 @@ namespace CmdOneLinerNET
         /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
         /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
         /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
-        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null)
+        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort)
         {
             using Process p = new Process();
             p.StartInfo.CreateNoWindow = true;
@@ -62,7 +62,18 @@ namespace CmdOneLinerNET
             });
 
             p.Start();
-
+            try { p.PriorityClass = priority; } catch { }
+            if (Environment.OSVersion.Platform == PlatformID.Unix && iopriority != IOPriorityClass.L02_NormalEffort)
+            {
+                try
+                {
+                    SetIOPriority(p.Id, iopriority);
+                }
+                catch (Exception ex)
+                {
+                    if (timeout > TimeSpan.FromMinutes(1)) Debugger.Break();
+                }
+            }
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
 
@@ -73,24 +84,24 @@ namespace CmdOneLinerNET
             TimeSpan upt = TimeSpan.Zero;
             TimeSpan tpt = TimeSpan.Zero;
             Task.Factory.StartNew(() =>
-                {
-                    Thread.CurrentThread.Name = $"{nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
-                    Stopwatch runningfor = Stopwatch.StartNew();
+            {
+                Thread.CurrentThread.Name = $"{nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
+                Stopwatch runningfor = Stopwatch.StartNew();
 
-                    try
+                try
+                {
+                    while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
                     {
-                        while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
-                        {
-                            p.Refresh();
-                            maxmem = p.PeakWorkingSet64;
-                            if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
-                            if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
-                        }
-                        if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
-                        else Task.Delay(100).Wait();
+                        p.Refresh();
+                        maxmem = p.PeakWorkingSet64;
+                        if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
+                        if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
                     }
-                    catch { }
-                });
+                    if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
+                    else Task.Delay(100).Wait();
+                }
+                catch { }
+            });
 
             try
             {
@@ -109,6 +120,27 @@ namespace CmdOneLinerNET
                             if (sw.Elapsed > TimeSpan.FromSeconds(60)) throw new Exception($".NET says that process '{cmd}' has exited and it has not been killed but after waiting for 60 seconds it is still running.");
                         }
                         p.Refresh();
+
+                        { // sometimes 'Process' throws an exception while trying to read ExitCode saying the process hasn't finished even though it has. May be a sync issue when CPU is overloaded. So we retry a few times
+                            int retried = 0;
+                            bool exception = false;
+                            do
+                            {
+                                try
+                                {
+                                    int exitcode = p.ExitCode;
+                                    exception = false;
+                                }
+                                catch (InvalidOperationException ex)
+                                {
+                                    exception = true;
+                                    retried++;
+                                    if (retried > 5) throw new Exception($"Unable to retrieve process '{cmd}' info: {ex.Message}");
+                                    Thread.Sleep(TimeSpan.FromSeconds(2 * retried));
+                                }
+                            } while (exception);
+                        }
+
                         return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt);
                     }
                 }
@@ -118,6 +150,49 @@ namespace CmdOneLinerNET
             {
                 cancelTokenRegistration?.Dispose();
             }
+        }
+
+        /// <summary>Execute a command-line application.</summary>
+        /// <param name="cmd">Command to execute, and its arguments</param>
+        /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
+        /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
+        /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
+        public static void RunInBackground(string cmd, Action<(int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime)> exited, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null)
+        {
+            Task.Factory.StartNew(() =>
+            {
+                try { Thread.CurrentThread.Name = $"Run command in background: {cmd}"; } catch { }
+                (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
+                exited(result);
+            }, TaskCreationOptions.LongRunning);
+        }
+
+        public static void SetIOPriority(int pid, IOPriorityClass iopriority)
+        {
+            if (Environment.OSVersion.Platform != PlatformID.Unix) throw new Exception($"IO Priority is only supported on Linux");
+            int ioclass, ioclassdata = 0;
+            switch (iopriority)
+            {
+                case IOPriorityClass.L00_Idle: ioclass = 3; break;
+                case IOPriorityClass.L01_LowEffort: ioclass = 2; ioclassdata = 7; break;
+                case IOPriorityClass.L02_NormalEffort: ioclass = 2; ioclassdata = 4; break;
+                case IOPriorityClass.L03_HighEffort: ioclass = 2; ioclassdata = 0; break;
+                case IOPriorityClass.L04_Admin_RealTime_LowEffort: ioclass = 1; ioclassdata = 7; break;
+                case IOPriorityClass.L05_Admin_RealTime_AverageEffort: ioclass = 1; ioclassdata = 4; break;
+                case IOPriorityClass.L06_Admin_RealTime_ExtremelyHighEffort: ioclass = 1; ioclassdata = 0; break;
+                default: throw new NotImplementedException(iopriority.ToString());
+            }
+            int ExitCode; bool? Success = null; string StdOut; string StdErr1 = ""; string StdErr2 = ""; long MaxRamUsedBytes; TimeSpan UserProcessorTime; TimeSpan TotalProcessorTime;
+            try { (ExitCode, Success, StdOut, StdErr1, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
+            catch (InvalidOperationException) { } // ignore, probably the process already exited
+            if (Success != true)
+            {
+                // try as root, in case user has been added as no-pass sudoer in /etc/sudoers as:
+                // username ALL=(ALL) NOPASSWD: /usr/bin/ionice
+                try { (ExitCode, Success, StdOut, StdErr2, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"sudo -n ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
+                catch (InvalidOperationException) { } // ignore, probably the process already exited
+            }
+            if (Success != true) throw new Exception($"Unable to set I/O Priority '{iopriority}' of process {pid}: {StdErr1}. Trying again as root: {StdErr2}");
         }
     }
 }
