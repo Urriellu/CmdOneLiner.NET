@@ -85,7 +85,7 @@ namespace CmdOneLinerNET
             TimeSpan tpt = TimeSpan.Zero;
             Task.Factory.StartNew(() =>
             {
-                Thread.CurrentThread.Name = $"{nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
+                Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] {nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
                 Stopwatch runningfor = Stopwatch.StartNew();
 
                 try
@@ -161,7 +161,7 @@ namespace CmdOneLinerNET
         {
             Task.Factory.StartNew(() =>
             {
-                try { Thread.CurrentThread.Name = $"Run command in background: {cmd}"; } catch { }
+                try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run command in background: {cmd}"; } catch { }
                 (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
                 exited(result);
             }, TaskCreationOptions.LongRunning);
