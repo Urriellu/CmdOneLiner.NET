@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -15,21 +16,23 @@ namespace CmdOneLinerNET
         /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
         /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
         /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
-        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort)
+        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort, string StdIn = null)
         {
             using Process p = new Process();
             p.StartInfo.CreateNoWindow = true;
             p.StartInfo.FileName = cmd.Split(' ').First();
             if (!string.IsNullOrEmpty(workingdir))
             {
-                if (System.IO.File.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' is actually a file, not a directory.");
-                if (!System.IO.Directory.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' does not exist.");
+                //if (File.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' is actually a file, not a directory.");
+                //if (!Directory.Exists(workingdir)) throw new Exception($"Working directory '{workingdir}' does not exist.");
                 p.StartInfo.WorkingDirectory = workingdir;
             }
             if (cmd.Length > p.StartInfo.FileName.Length + 1) p.StartInfo.Arguments = cmd.Substring(p.StartInfo.FileName.Length + 1);
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
+
+            if (!string.IsNullOrEmpty(StdIn)) p.StartInfo.RedirectStandardInput = true;
 
             StringBuilder stdout = new StringBuilder();
             StringBuilder stderr = new StringBuilder();
@@ -56,13 +59,17 @@ namespace CmdOneLinerNET
                     killed = true;
                     try { p.Kill(); }
                     catch (Exception ex) { throw new Exception($"Error while trying to kill process '{cmd}': {ex.Message}"); }
-                    try { if (!p.WaitForExit(60 * 1000)) throw new Exception($"Process '{cmd}' has not been killed after being canceled"); }
+                    try
+                    {
+                        if (!p.WaitForExit(60 * 1000)) throw new Exception($"Process '{cmd}' has not been killed after being canceled");
+                    }
                     catch (Exception ex) { throw new Exception($"Error while waiting after trying to kill process '{cmd}': {ex.Message}"); }
                 }
             });
 
             p.Start();
-            try { p.PriorityClass = priority; } catch { }
+            try { p.PriorityClass = priority; }
+            catch { }
             if (Environment.OSVersion.Platform == PlatformID.Unix && iopriority != IOPriorityClass.L02_NormalEffort)
             {
                 try
@@ -102,6 +109,12 @@ namespace CmdOneLinerNET
                 }
                 catch { }
             });
+
+            if (!string.IsNullOrEmpty(StdIn))
+            {
+                p.StandardInput.Write(StdIn);
+                p.StandardInput.Close();
+            }
 
             try
             {
@@ -161,7 +174,8 @@ namespace CmdOneLinerNET
         {
             Task.Factory.StartNew(() =>
             {
-                try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run command in background: {cmd}"; } catch { }
+                try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run command in background: {cmd}"; }
+                catch { }
                 (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
                 exited(result);
             }, TaskCreationOptions.LongRunning);
@@ -173,16 +187,43 @@ namespace CmdOneLinerNET
             int ioclass, ioclassdata = 0;
             switch (iopriority)
             {
-                case IOPriorityClass.L00_Idle: ioclass = 3; break;
-                case IOPriorityClass.L01_LowEffort: ioclass = 2; ioclassdata = 7; break;
-                case IOPriorityClass.L02_NormalEffort: ioclass = 2; ioclassdata = 4; break;
-                case IOPriorityClass.L03_HighEffort: ioclass = 2; ioclassdata = 0; break;
-                case IOPriorityClass.L04_Admin_RealTime_LowEffort: ioclass = 1; ioclassdata = 7; break;
-                case IOPriorityClass.L05_Admin_RealTime_AverageEffort: ioclass = 1; ioclassdata = 4; break;
-                case IOPriorityClass.L06_Admin_RealTime_ExtremelyHighEffort: ioclass = 1; ioclassdata = 0; break;
+                case IOPriorityClass.L00_Idle:
+                    ioclass = 3;
+                    break;
+                case IOPriorityClass.L01_LowEffort:
+                    ioclass = 2;
+                    ioclassdata = 7;
+                    break;
+                case IOPriorityClass.L02_NormalEffort:
+                    ioclass = 2;
+                    ioclassdata = 4;
+                    break;
+                case IOPriorityClass.L03_HighEffort:
+                    ioclass = 2;
+                    ioclassdata = 0;
+                    break;
+                case IOPriorityClass.L04_Admin_RealTime_LowEffort:
+                    ioclass = 1;
+                    ioclassdata = 7;
+                    break;
+                case IOPriorityClass.L05_Admin_RealTime_AverageEffort:
+                    ioclass = 1;
+                    ioclassdata = 4;
+                    break;
+                case IOPriorityClass.L06_Admin_RealTime_ExtremelyHighEffort:
+                    ioclass = 1;
+                    ioclassdata = 0;
+                    break;
                 default: throw new NotImplementedException(iopriority.ToString());
             }
-            int ExitCode; bool? Success = null; string StdOut; string StdErr1 = ""; string StdErr2 = ""; long MaxRamUsedBytes; TimeSpan UserProcessorTime; TimeSpan TotalProcessorTime;
+            int ExitCode;
+            bool? Success = null;
+            string StdOut;
+            string StdErr1 = "";
+            string StdErr2 = "";
+            long MaxRamUsedBytes;
+            TimeSpan UserProcessorTime;
+            TimeSpan TotalProcessorTime;
             try { (ExitCode, Success, StdOut, StdErr1, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
             catch (InvalidOperationException) { } // ignore, probably the process already exited
             if (Success != true)
