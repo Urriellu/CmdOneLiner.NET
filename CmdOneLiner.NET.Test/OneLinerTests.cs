@@ -10,7 +10,7 @@ namespace CmdOneLinerNET.Test
         [TestMethod, Timeout(10 * 1000)]
         public void T01_BasicTest()
         {
-            (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 1");
+            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 1");
             Assert.AreEqual(ExitCode, 0);
             Assert.AreEqual(Success, true);
             Assert.IsTrue(MaxRamUsedBytes > 0 && MaxRamUsedBytes < 50 * 1000 * 1000);
@@ -23,7 +23,7 @@ namespace CmdOneLinerNET.Test
         [TestMethod, Timeout(10 * 1000)]
         public void T02_TimeoutTest()
         {
-            (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 10", timeout: TimeSpan.FromSeconds(1));
+            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 10", timeout: TimeSpan.FromSeconds(1));
             Assert.AreNotEqual(ExitCode, 0);
             Assert.AreEqual(Success, false);
             Assert.IsTrue(UserProcessorTime < TimeSpan.FromSeconds(5));
@@ -42,7 +42,7 @@ namespace CmdOneLinerNET.Test
                 cancelSrc.Cancel();
             });
 
-            (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 60", canceltoken: token);
+            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"Sleeper.exe 60", canceltoken: token);
             Assert.AreNotEqual(ExitCode, 0);
             Assert.AreEqual(Success, false);
             Assert.IsTrue(UserProcessorTime > TimeSpan.FromSeconds(1));

@@ -16,7 +16,7 @@ namespace CmdOneLinerNET
         /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
         /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
         /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
-        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort, string StdIn = null)
+        public static (int ExitCode, bool Success, string StdOut, string StdErr, Int64? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) Run(string cmd, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort, string StdIn = null, bool ignoreStatistics = false)
         {
             using Process p = new Process();
             p.StartInfo.CreateNoWindow = true;
@@ -87,28 +87,31 @@ namespace CmdOneLinerNET
             int timeoutms = int.MaxValue;
             if (timeout != null) timeoutms = (int)timeout.Value.TotalMilliseconds;
 
-            Int64 maxmem = 0;
-            TimeSpan upt = TimeSpan.Zero;
-            TimeSpan tpt = TimeSpan.Zero;
-            Task.Factory.StartNew(() =>
+            Int64? maxmem = 0;
+            TimeSpan? upt = TimeSpan.Zero;
+            TimeSpan? tpt = TimeSpan.Zero;
+            if (!ignoreStatistics)
             {
-                Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] {nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
-                Stopwatch runningfor = Stopwatch.StartNew();
-
-                try
+                Task.Factory.StartNew(() =>
                 {
-                    while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
+                    Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] {nameof(CmdOneLiner)}:Process '{p.StartInfo.FileName}' max mem usage checker";
+                    Stopwatch runningfor = Stopwatch.StartNew();
+
+                    try
                     {
-                        p.Refresh();
-                        maxmem = p.PeakWorkingSet64;
-                        if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
-                        if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
+                        while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
+                        {
+                            p.Refresh();
+                            maxmem = p.PeakWorkingSet64;
+                            if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
+                            if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
+                        }
+                        if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
+                        else Task.Delay(100).Wait();
                     }
-                    if (canceltoken.HasValue) Task.Delay(500, canceltoken.Value).Wait();
-                    else Task.Delay(100).Wait();
-                }
-                catch { }
-            });
+                    catch { }
+                });
+            }
 
             if (!string.IsNullOrEmpty(StdIn))
             {
@@ -154,7 +157,21 @@ namespace CmdOneLinerNET
                             } while (exception);
                         }
 
-                        return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt);
+                        int errored = 0;
+                        while (true)
+                        {
+                            try { return (p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt); }
+                            catch (InvalidOperationException ex)
+                            {
+                                errored++;
+                                if (errored < 10)
+                                {
+                                    Console.Error.WriteLine($"Process '{cmd}' is supposed to be terminated but we cannot read its status. Error: {ex.Message}. Retrying...");
+                                    Thread.Sleep(TimeSpan.FromSeconds(errored));
+                                }
+                                else throw new Exception($"Process '{cmd}' is supposed to be terminated but we could not read its status after retrying {errored} times. Error: {ex.Message}.", ex);
+                            }
+                        }
                     }
                 }
                 else return (-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process timed out.", maxmem, upt, tpt);
@@ -170,13 +187,13 @@ namespace CmdOneLinerNET
         /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
         /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
         /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
-        public static void RunInBackground(string cmd, Action<(int ExitCode, bool Success, string StdOut, string StdErr, Int64 MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime)> exited, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null)
+        public static void RunInBackground(string cmd, Action<(int ExitCode, bool Success, string StdOut, string StdErr, Int64? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime)> exited, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null)
         {
             Task.Factory.StartNew(() =>
             {
                 try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run command in background: {cmd}"; }
                 catch { }
-                (int ExitCode, bool Success, string StdOut, string StdErr, long MaxRamUsedBytes, TimeSpan UserProcessorTime, TimeSpan TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
+                (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
                 exited(result);
             }, TaskCreationOptions.LongRunning);
         }
@@ -221,16 +238,16 @@ namespace CmdOneLinerNET
             string StdOut;
             string StdErr1 = "";
             string StdErr2 = "";
-            long MaxRamUsedBytes;
-            TimeSpan UserProcessorTime;
-            TimeSpan TotalProcessorTime;
+            long? MaxRamUsedBytes;
+            TimeSpan? UserProcessorTime;
+            TimeSpan? TotalProcessorTime;
             try { (ExitCode, Success, StdOut, StdErr1, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
             catch (InvalidOperationException) { } // ignore, probably the process already exited
             if (Success != true)
             {
                 // try as root, in case user has been added as no-pass sudoer in /etc/sudoers as:
                 // username ALL=(ALL) NOPASSWD: /usr/bin/ionice
-                try { (ExitCode, Success, StdOut, StdErr2, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"sudo -n ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
+                try { (ExitCode, Success, StdOut, StdErr2, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"sudo -n ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1), ignoreStatistics: true); }
                 catch (InvalidOperationException) { } // ignore, probably the process already exited
             }
             if (Success != true) throw new Exception($"Unable to set I/O Priority '{iopriority}' of process {pid}: {StdErr1}. Trying again as root: {StdErr2}");
