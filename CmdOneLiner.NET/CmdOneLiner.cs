@@ -72,14 +72,8 @@ namespace CmdOneLinerNET
             catch { }
             if (Environment.OSVersion.Platform == PlatformID.Unix && iopriority != IOPriorityClass.L02_NormalEffort)
             {
-                try
-                {
-                    SetIOPriority(p.Id, iopriority);
-                }
-                catch (Exception ex)
-                {
-                    if (timeout > TimeSpan.FromMinutes(1)) Debugger.Break();
-                }
+                try { SetIOPriority(p.Id, iopriority); }
+                catch { }
             }
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
@@ -187,13 +181,13 @@ namespace CmdOneLinerNET
         /// <param name="workingdir">Path to working directory. If null, the current one (<see cref="Environment.CurrentDirectory"/>) will be used.</param>
         /// <param name="timeout">If not null, the command will be killed after the given timeout.</param>
         /// <param name="canceltoken">Optional object used to kill the process on demand.</param>
-        public static void RunInBackground(string cmd, Action<(int ExitCode, bool Success, string StdOut, string StdErr, Int64? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime)> exited, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null)
+        public static void RunInBackground(string cmd, Action<(int ExitCode, bool Success, string StdOut, string StdErr, Int64? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime)> exited, string workingdir = null, TimeSpan? timeout = null, CancellationToken? canceltoken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass iopriority = IOPriorityClass.L02_NormalEffort, string StdIn = null, bool ignoreStatistics = false)
         {
             Task.Factory.StartNew(() =>
             {
                 try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run command in background: {cmd}"; }
                 catch { }
-                (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken);
+                (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) result = Run(cmd, workingdir, timeout, canceltoken, priority, iopriority, StdIn, ignoreStatistics);
                 exited(result);
             }, TaskCreationOptions.LongRunning);
         }
@@ -241,7 +235,7 @@ namespace CmdOneLinerNET
             long? MaxRamUsedBytes;
             TimeSpan? UserProcessorTime;
             TimeSpan? TotalProcessorTime;
-            try { (ExitCode, Success, StdOut, StdErr1, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1)); }
+            try { (ExitCode, Success, StdOut, StdErr1, MaxRamUsedBytes, UserProcessorTime, TotalProcessorTime) = Run($"ionice -p {pid} -c {ioclass} -n {ioclassdata}", timeout: TimeSpan.FromMinutes(1), ignoreStatistics: true); }
             catch (InvalidOperationException) { } // ignore, probably the process already exited
             if (Success != true)
             {
