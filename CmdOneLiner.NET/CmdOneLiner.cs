@@ -42,12 +42,20 @@ namespace CmdOneLinerNET
             using AutoResetEvent errorWaitHandle = new AutoResetEvent(false);
             p.OutputDataReceived += (sender, e) =>
             {
-                if (e.Data == null) outputWaitHandle.Set();
+                if (e.Data == null)
+                {
+                    try { outputWaitHandle.Set(); }
+                    catch { }
+                }
                 else stdout.AppendLine(e.Data);
             };
             p.ErrorDataReceived += (sender, e) =>
             {
-                if (e.Data == null) errorWaitHandle.Set();
+                if (e.Data == null)
+                {
+                    try { errorWaitHandle.Set(); }
+                    catch { }
+                }
                 else stderr.AppendLine(e.Data);
             };
 
@@ -100,7 +108,7 @@ namespace CmdOneLinerNET
                         while (!p.HasExited && runningfor.ElapsedMilliseconds < timeoutms && canceltoken?.IsCancellationRequested != true)
                         {
                             p.Refresh();
-                            maxmem = p.PeakWorkingSet64;
+                            maxmem = Max(maxmem, p.PeakWorkingSet64, p.WorkingSet64);
                             if (p.UserProcessorTime > upt) upt = p.UserProcessorTime;
                             if (p.TotalProcessorTime > tpt) tpt = p.TotalProcessorTime;
                         }
@@ -258,6 +266,15 @@ namespace CmdOneLinerNET
             }
 
             if (Success != true) throw new Exception($"Unable to set I/O Priority '{iopriority}' of process {pid}: {StdErr1}. Trying again as root: {StdErr2}");
+        }
+        
+        
+
+        static Int64 Max(params long?[] values)
+        {
+            Int64 max = 0;
+            foreach (Int64? value in values) if (value > max) max = value.Value;
+            return max;
         }
     }
 }
