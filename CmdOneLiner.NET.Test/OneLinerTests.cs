@@ -11,8 +11,9 @@ namespace CmdOneLinerNET.Test
     {
         private readonly string nameSleeperBinary = System.IO.File.Exists("Sleeper.exe") ? "Sleeper.exe" : "Sleeper";
 
-        [TestMethod, Timeout(10 * 1000)]
-        public void T01_BasicTest(bool multithreaded = false)
+        [TestMethod, Timeout(10 * 1000)] public void T01_BasicTest() => T01_BasicTest_Logic();
+        
+        public void T01_BasicTest_Logic(bool multithreaded = false)
         {
             (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"{nameSleeperBinary} 1");
             Assert.AreEqual(ExitCode, 0);
@@ -43,8 +44,9 @@ namespace CmdOneLinerNET.Test
             Assert.IsTrue(StdErr.Contains("timed out"));
         }
 
-        [TestMethod, Timeout(10 * 1000)]
-        public void T03_KillProcessTest(bool multithreaded = false)
+        [TestMethod, Timeout(10 * 1000)] public void T03_KillProcessTest() => T03_KillProcessTest_Logic(false);
+        
+        public void T03_KillProcessTest_Logic(bool multithreaded = false)
         {
             System.Threading.CancellationTokenSource cancelSrc = new System.Threading.CancellationTokenSource();
             System.Threading.CancellationToken token = cancelSrc.Token;
@@ -78,9 +80,9 @@ namespace CmdOneLinerNET.Test
             Stopwatch runningFor = Stopwatch.StartNew();
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < amountThreadsPerTest; i++) {
-                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T01_BasicTest(multithreaded: true); }));
+                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T01_BasicTest_Logic(multithreaded: true); }));
                 tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T02_TimeoutTest(); }));
-                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T03_KillProcessTest(multithreaded: true); }));
+                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T03_KillProcessTest_Logic(multithreaded: true); }));
             }
             Task.WaitAll(tasks.ToArray());
         }
