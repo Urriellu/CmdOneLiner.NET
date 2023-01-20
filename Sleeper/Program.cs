@@ -15,7 +15,7 @@ namespace Sleeper
             {
                 Stopwatch sw = Stopwatch.StartNew();
                 while (sw.Elapsed < TimeSpan.FromSeconds(seconds)) ; // loop which utilizes 100% of one CPU core
-                Console.WriteLine($"Finished sleeping {seconds} seconds.");
+                Console.Write($"Finished sleeping {seconds} seconds.");
             }
         }
     }
