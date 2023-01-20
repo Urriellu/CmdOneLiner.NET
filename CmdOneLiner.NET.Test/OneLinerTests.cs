@@ -15,33 +15,33 @@ namespace CmdOneLinerNET.Test
         
         public void T01_BasicTest_Logic(bool multithreaded = false)
         {
-            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"{nameSleeperBinary} 1");
-            Assert.AreEqual(ExitCode, 0);
-            Assert.AreEqual(Success, true);
+            CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 1");
+            Assert.AreEqual(cmdOut?.ExitCode, 0);
+            Assert.AreEqual(cmdOut?.Success, true);
             if (multithreaded)
             {
-                Assert.IsTrue(MaxRamUsedBytes >= 0 && MaxRamUsedBytes < 50 * 1000 * 1000);
-                Assert.IsTrue(UserProcessorTime >= TimeSpan.Zero);
-                Assert.IsTrue(TotalProcessorTime >= TimeSpan.Zero);
+                Assert.IsTrue(cmdOut.MaxRamUsedBytes >= 0 && cmdOut.MaxRamUsedBytes < 50 * 1000 * 1000);
+                Assert.IsTrue(cmdOut.UserProcessorTime >= TimeSpan.Zero);
+                Assert.IsTrue(cmdOut.TotalProcessorTime >= TimeSpan.Zero);
             }
             else
             {
-                Assert.IsTrue(MaxRamUsedBytes > 0 && MaxRamUsedBytes < 50 * 1000 * 1000);
-                Assert.IsTrue(UserProcessorTime > TimeSpan.Zero);
-                Assert.IsTrue(TotalProcessorTime > TimeSpan.Zero);
+                Assert.IsTrue(cmdOut.MaxRamUsedBytes > 0 && cmdOut.MaxRamUsedBytes < 50 * 1000 * 1000);
+                Assert.IsTrue(cmdOut.UserProcessorTime > TimeSpan.Zero);
+                Assert.IsTrue(cmdOut.TotalProcessorTime > TimeSpan.Zero);
             }
-            Assert.IsTrue(UserProcessorTime < TimeSpan.FromSeconds(5));
-            Assert.IsTrue(TotalProcessorTime < TimeSpan.FromSeconds(5));
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
         }
 
         [TestMethod, Timeout(10 * 1000)]
         public void T02_TimeoutTest()
         {
-            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"{nameSleeperBinary} 10", timeout: TimeSpan.FromSeconds(1));
-            Assert.AreNotEqual(ExitCode, 0);
-            Assert.AreEqual(Success, false);
-            Assert.IsTrue(UserProcessorTime < TimeSpan.FromSeconds(5));
-            Assert.IsTrue(StdErr.Contains("timed out"));
+            CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 10", timeout: TimeSpan.FromSeconds(1));
+            Assert.AreNotEqual(cmdOut.ExitCode, 0);
+            Assert.AreEqual(cmdOut.Success, false);
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
+            Assert.IsTrue(cmdOut.StdErr.Contains("timed out"));
         }
 
         [TestMethod, Timeout(10 * 1000)] public void T03_KillProcessTest() => T03_KillProcessTest_Logic(false);
@@ -59,17 +59,15 @@ namespace CmdOneLinerNET.Test
                 cancelSrc.Cancel();
             });
 
-            Stopwatch execTime = Stopwatch.StartNew();
-            (int ExitCode, bool Success, string StdOut, string StdErr, long? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime) = CmdOneLiner.Run($"{nameSleeperBinary} 60", canceltoken: token);
-            execTime.Stop();
-            Assert.AreNotEqual(ExitCode, 0);
-            Assert.AreEqual(Success, false);
-            if (multithreaded) Assert.IsTrue(UserProcessorTime >= TimeSpan.FromSeconds(0));
-            else Assert.IsTrue(UserProcessorTime > TimeSpan.FromSeconds(0));
-            Assert.IsTrue(UserProcessorTime < TimeSpan.FromSeconds(10));
-            Assert.IsTrue(execTime.Elapsed >= TimeSpan.FromSeconds(3));
-            Assert.IsTrue(execTime.Elapsed < TimeSpan.FromSeconds(multithreaded ? 120 : 10));
-            Assert.IsTrue(StdErr.Contains("killed"));
+            CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 60", canceltoken: token);
+            Assert.AreNotEqual(cmdOut.ExitCode, 0);
+            Assert.AreEqual(cmdOut.Success, false);
+            if (multithreaded) Assert.IsTrue(cmdOut.UserProcessorTime >= TimeSpan.FromSeconds(0));
+            else Assert.IsTrue(cmdOut.UserProcessorTime > TimeSpan.FromSeconds(0));
+            Assert.IsTrue(cmdOut.UserProcessorTime < TimeSpan.FromSeconds(1));
+            Assert.IsTrue(cmdOut.RunningFor >= TimeSpan.FromSeconds(4));
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(multithreaded ? 120 : 10));
+            Assert.IsTrue(cmdOut.StdErr.Contains("killed"));
         }
 
         [TestMethod, Timeout(5 * 60 * 1000)]
