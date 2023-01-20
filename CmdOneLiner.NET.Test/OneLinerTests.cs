@@ -48,7 +48,7 @@ namespace CmdOneLinerNET.Test
         
         public void T03_KillProcessTest_Logic(bool multithreaded = false)
         {
-            System.Threading.CancellationTokenSource cancelSrc = new System.Threading.CancellationTokenSource();
+            System.Threading.CancellationTokenSource cancelSrc = new();
             System.Threading.CancellationToken token = cancelSrc.Token;
 
             // Create a new thread/task that will cancel the command after 3 seconds
@@ -59,7 +59,7 @@ namespace CmdOneLinerNET.Test
                 cancelSrc.Cancel();
             });
 
-            CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 60", canceltoken: token);
+            CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 60", cancelToken: token);
             Assert.AreNotEqual(cmdOut.ExitCode, 0);
             Assert.AreEqual(cmdOut.Success, false);
             if (multithreaded) Assert.IsTrue(cmdOut.UserProcessorTime >= TimeSpan.FromSeconds(0));
@@ -76,7 +76,7 @@ namespace CmdOneLinerNET.Test
             const int amountThreadsPerTest = 5;
             TimeSpan runFor = TimeSpan.FromSeconds(30);
             Stopwatch runningFor = Stopwatch.StartNew();
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = new();
             for (int i = 0; i < amountThreadsPerTest; i++) {
                 tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T01_BasicTest_Logic(multithreaded: true); }));
                 tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T02_TimeoutTest(); }));

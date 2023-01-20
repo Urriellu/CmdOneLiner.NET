@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace CmdOneLinerNET.Sample
@@ -11,7 +12,7 @@ namespace CmdOneLinerNET.Sample
                 // Basic usage
                 Console.WriteLine("Sleeping for 5 seconds...");
                 CmdResult cmdOut = CmdOneLiner.Run("Sleeper 5", timeout: TimeSpan.FromSeconds(20));
-                Console.WriteLine($"Sleeper program executed in {cmdOut?.RunningFor.TotalSeconds} seconds ({cmdOut?.TotalProcessorTime?.TotalSeconds}), used {cmdOut?.MaxRamUsedBytes / 1024 / 1024} MiB of RAM, and printed to the standard output: \"{cmdOut?.StdOut}\".");
+                Console.WriteLine($"Sleeper program executed in {cmdOut?.RunningFor.TotalSeconds} seconds ({cmdOut?.TotalProcessorTime?.TotalSeconds}), used {cmdOut?.MaxRamUsedBytes / 1024 / 1024} MiB of RAM, and printed to the standard output: \"{cmdOut?.StdOut.TrimEnd(Environment.NewLine.ToCharArray())}\".");
             }
 
             {
