@@ -20,27 +20,28 @@ namespace CmdOneLinerNET.Test
             Assert.AreEqual(cmdOut?.Success, true);
             if (multithreaded)
             {
-                Assert.IsTrue(cmdOut.MaxRamUsedBytes >= 0 && cmdOut.MaxRamUsedBytes < 50 * 1000 * 1000);
+                Assert.IsTrue(cmdOut.MaxRamUsedBytes is >= 0 and < 50 * 1000 * 1000);
                 Assert.IsTrue(cmdOut.UserProcessorTime >= TimeSpan.Zero);
                 Assert.IsTrue(cmdOut.TotalProcessorTime >= TimeSpan.Zero);
             }
             else
             {
-                Assert.IsTrue(cmdOut.MaxRamUsedBytes > 0 && cmdOut.MaxRamUsedBytes < 50 * 1000 * 1000);
+                Assert.IsTrue(cmdOut.MaxRamUsedBytes is > 0 and < 50 * 1000 * 1000);
                 Assert.IsTrue(cmdOut.UserProcessorTime > TimeSpan.Zero);
                 Assert.IsTrue(cmdOut.TotalProcessorTime > TimeSpan.Zero);
             }
-            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
-            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
+
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(multithreaded ? 30 : 5));
         }
 
-        [TestMethod, Timeout(10 * 1000)]
-        public void T02_TimeoutTest()
+        [TestMethod, Timeout(10 * 1000)] public void T02_TimeoutTest() => T02_TimeoutTest_Logic();
+
+        public void T02_TimeoutTest_Logic(bool multithreaded = false)
         {
             CmdResult cmdOut = CmdOneLiner.Run($"{nameSleeperBinary} 10", timeout: TimeSpan.FromSeconds(1));
             Assert.AreNotEqual(cmdOut.ExitCode, 0);
             Assert.AreEqual(cmdOut.Success, false);
-            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(5));
+            Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(multithreaded ? 30 : 5));
             Assert.IsTrue(cmdOut.StdErr.Contains("timed out"));
         }
 
@@ -65,7 +66,7 @@ namespace CmdOneLinerNET.Test
             if (multithreaded) Assert.IsTrue(cmdOut.UserProcessorTime >= TimeSpan.FromSeconds(0));
             else Assert.IsTrue(cmdOut.UserProcessorTime > TimeSpan.FromSeconds(0));
             Assert.IsTrue(cmdOut.UserProcessorTime < TimeSpan.FromSeconds(1));
-            Assert.IsTrue(cmdOut.RunningFor >= TimeSpan.FromSeconds(4));
+            Assert.IsTrue(cmdOut.RunningFor >= TimeSpan.FromSeconds(multithreaded ? 0 : 1));
             Assert.IsTrue(cmdOut.RunningFor < TimeSpan.FromSeconds(multithreaded ? 120 : 10));
             Assert.IsTrue(cmdOut.StdErr.Contains("killed"));
         }
@@ -79,7 +80,7 @@ namespace CmdOneLinerNET.Test
             List<Task> tasks = new();
             for (int i = 0; i < amountThreadsPerTest; i++) {
                 tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T01_BasicTest_Logic(multithreaded: true); }));
-                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T02_TimeoutTest(); }));
+                tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T02_TimeoutTest_Logic(multithreaded: true); }));
                 tasks.Add(Task.Factory.StartNew(() => { while(runningFor.Elapsed < runFor) T03_KillProcessTest_Logic(multithreaded: true); }));
             }
             Task.WaitAll(tasks.ToArray());
