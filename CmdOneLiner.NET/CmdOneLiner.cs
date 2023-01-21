@@ -71,18 +71,18 @@ namespace CmdOneLinerNET
 
             CancellationTokenRegistration? cancelTokenRegistration = cancelToken?.Register(() =>
             {
-                if (!p?.HasExited == true)
+                try
                 {
-                    killed = true;
-                    try { p.Kill(); }
-                    catch (Exception ex) { throw new($"Error while trying to kill process '{cmd}': {ex.Message}"); }
-
-                    try
+                    if (!p?.HasExited == true)
                     {
+                        killed = true;
+                        try { p.Kill(); }
+                        catch (Exception ex) { throw new($"Error while trying to kill process '{cmd}': {ex.Message}"); }
+
                         if (!p.WaitForExit(60 * 1000)) throw new($"Process '{cmd}' has not been killed after being canceled");
                     }
-                    catch (Exception ex) { throw new($"Error while waiting after trying to kill process '{cmd}': {ex.Message}"); }
                 }
+                catch (Exception ex) { throw new($"Error while waiting after trying to kill process '{cmd}': {ex.Message}"); }
             });
 
             try{ p.Start(); }
