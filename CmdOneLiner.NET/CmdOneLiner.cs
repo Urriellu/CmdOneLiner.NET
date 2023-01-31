@@ -149,9 +149,9 @@ namespace CmdOneLinerNET
                     }
                     else
                     {
-                        // wait until it has actually exited. This is needed because sometimes WaitForExit returns true but the process hasn't existed and then it throws an exception when trying to read ExistCode
+                        // wait until it has actually exited. This is needed because sometimes WaitForExit returns true but the process hasn't existed and then it throws an exception when trying to read ExitCode
                         Stopwatch sw = Stopwatch.StartNew();
-                        while (!p.HasExited)
+                        while (!p.HasExitedSafe())
                         {
                             Thread.Sleep(100);
                             if (sw.Elapsed > TimeSpan.FromSeconds(60)) throw new($".NET says that process '{cmd}' has exited and it has not been killed but after waiting for 60 seconds it is still running.");
