@@ -24,7 +24,8 @@ namespace CmdOneLinerNET
         /// <param name="stdIn">Contents of the standard input to pass to the process.</param>
         /// <param name="ignoreStatistics">Statistics are not calculated for this process (recommended to set to false when executing fast commands very often).</param>
         /// <param name="throwOnFail">Throw an exception when process exits with an error. If false, no exception is thrown but <see cref="CmdResult.Success"/> will be false.</param>
-        public static CmdResult Run(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false)
+        /// <param name="realTimeOutput">Print out to the standard output and standard error messages as they come.</param>
+        public static CmdResult Run(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false)
         {
             using Process p = new();
             p.StartInfo.CreateNoWindow = true;
@@ -55,7 +56,10 @@ namespace CmdOneLinerNET
                     try { outputWaitHandle.Set(); }
                     catch { }
                 }
-                else stdout.AppendLine(e.Data);
+                else {
+                    stdout.AppendLine(e.Data);
+                    if(realTimeOutput) Console.WriteLine(e.Data);
+                }
             };
             p.ErrorDataReceived += (sender, e) =>
             {
@@ -64,7 +68,10 @@ namespace CmdOneLinerNET
                     try { errorWaitHandle.Set(); }
                     catch { }
                 }
-                else stderr.AppendLine(e.Data);
+                else {
+                    if(realTimeOutput) Console.Error.WriteLine(e.Data);
+                    stderr.AppendLine(e.Data);
+                }
             };
 
             bool killed = false;
@@ -238,14 +245,16 @@ namespace CmdOneLinerNET
         /// <param name="ioPriority">Priority of I/O (disk) operations (Linux/Unix only).</param>
         /// <param name="stdIn">Contents of the standard input to pass to the process.</param>
         /// <param name="ignoreStatistics">Statistics are not calculated for this process (recommended to set to false when executing fast commands very often).</param>
-        public static async Task<CmdResult> RunAsync(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false)
+        /// <param name="throwOnFail">Throw an exception when process exits with an error. If false, no exception is thrown but <see cref="CmdResult.Success"/> will be false.</param>
+        /// <param name="realTimeOutput">Print out to the standard output and standard error messages as they come.</param>
+        public static async Task<CmdResult> RunAsync(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false)
         {
             return await Task.Factory.StartNew(() =>
             {
                 try { Thread.CurrentThread.Name = $"[{Thread.CurrentThread.ManagedThreadId}] Run async command: {cmd}"; }
                 catch { }
 
-                return Run(cmd, workingDir, timeout, cancelToken, priority, ioPriority, stdIn, ignoreStatistics);
+                return Run(cmd, workingDir, timeout, cancelToken, priority, ioPriority, stdIn, ignoreStatistics, throwOnFail, realTimeOutput);
             }, TaskCreationOptions.LongRunning);
         }
 
