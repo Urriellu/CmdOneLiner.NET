@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace CmdOneLinerNET
 {
     public record CmdResult(int ExitCode, bool Success, string StdOut, string StdErr, Int64? MaxRamUsedBytes, TimeSpan? UserProcessorTime, TimeSpan? TotalProcessorTime, TimeSpan RunningFor);
-    
+
     /// <summary>Allows easily executing a command line application in one line of code.</summary>
     public static class CmdOneLiner
     {
@@ -25,7 +25,7 @@ namespace CmdOneLinerNET
         /// <param name="ignoreStatistics">Statistics are not calculated for this process (recommended to set to false when executing fast commands very often).</param>
         /// <param name="throwOnFail">Throw an exception when process exits with an error. If false, no exception is thrown but <see cref="CmdResult.Success"/> will be false.</param>
         /// <param name="realTimeOutput">Print out to the standard output and standard error messages as they come.</param>
-        public static CmdResult Run(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false)
+        public static CmdResult Run(string cmd, string workingDir = "/", TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false)
         {
             using Process p = new();
             p.StartInfo.CreateNoWindow = true;
@@ -56,9 +56,10 @@ namespace CmdOneLinerNET
                     try { outputWaitHandle.Set(); }
                     catch { }
                 }
-                else {
+                else
+                {
                     stdout.AppendLine(e.Data);
-                    if(realTimeOutput) Console.WriteLine(e.Data);
+                    if (realTimeOutput) Console.WriteLine(e.Data);
                 }
             };
             p.ErrorDataReceived += (sender, e) =>
@@ -68,8 +69,9 @@ namespace CmdOneLinerNET
                     try { errorWaitHandle.Set(); }
                     catch { }
                 }
-                else {
-                    if(realTimeOutput) Console.Error.WriteLine(e.Data);
+                else
+                {
+                    if (realTimeOutput) Console.Error.WriteLine(e.Data);
                     stderr.AppendLine(e.Data);
                 }
             };
@@ -92,8 +94,8 @@ namespace CmdOneLinerNET
                 catch (Exception ex) { throw new($"Error while waiting after trying to kill process '{cmd}': {ex.Message}"); }
             });
 
-            try{ p.Start(); }
-            catch (Win32Exception ex){ throw new Win32Exception($"{ex.Message}\nWorking directory: {workingDir}."); }
+            try { p.Start(); }
+            catch (Win32Exception ex) { throw new Win32Exception($"{ex.Message}\nWorking directory: {workingDir}."); }
 
             try { p.PriorityClass = priority; }
             catch { }
@@ -108,7 +110,7 @@ namespace CmdOneLinerNET
             p.BeginErrorReadLine();
 
             int timeoutms = int.MaxValue;
-            if (timeout != null) timeoutms = (int) timeout.Value.TotalMilliseconds;
+            if (timeout != null) timeoutms = (int)timeout.Value.TotalMilliseconds;
 
             Int64? maxmem = 0;
             TimeSpan? upt = TimeSpan.Zero;
@@ -148,8 +150,14 @@ namespace CmdOneLinerNET
                 bool exited = p.WaitForExit(timeoutms);
                 if (exited && outputWaitHandle.WaitOne(timeoutms) && errorWaitHandle.WaitOne(timeoutms))
                 {
-                    if (killed) return new(-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process killed.", maxmem, upt, tpt, runningFor.Elapsed);
-                    else if (!exited){
+                    if (killed)
+                    {
+                        CmdResult r = new(-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + "Process killed.", maxmem, upt, tpt, runningFor.Elapsed);
+                        if (throwOnFail) throw new OperationCanceledException(r.ToString());
+                        else return r;
+                    }
+                    else if (!exited)
+                    {
                         string errMsg = $"{stderr}{Environment.NewLine}Process not exited but also not killed. Unknown state.";
                         if (throwOnFail) throw new(errMsg);
                         return new(-1, false, stdout.ToString(), errMsg, maxmem, upt, tpt, runningFor.Elapsed);
@@ -189,7 +197,12 @@ namespace CmdOneLinerNET
                         int errored = 0;
                         while (true)
                         {
-                            try { return new(p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt, runningFor.Elapsed); }
+                            try
+                            {
+                                CmdResult r = new(p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt, runningFor.Elapsed);
+                                if (p.ExitCode != 0 && throwOnFail) throw new Exception(r.ToString());
+                                return r;
+                            }
                             catch (InvalidOperationException ex)
                             {
                                 errored++;
@@ -208,7 +221,7 @@ namespace CmdOneLinerNET
                     try { p.Kill(); }
                     catch { }
                     CmdResult r = new(-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + $"Process timed out ({timeout?.TotalMinutes} minutes).", maxmem, upt, tpt, runningFor.Elapsed);
-                    if(throwOnFail) throw new TimeoutException(r.ToString());
+                    if (throwOnFail) throw new TimeoutException(r.ToString());
                     else return r;
                 }
             }
@@ -314,8 +327,8 @@ namespace CmdOneLinerNET
 
             if (cmdOut?.Success != true) throw new($"Unable to set I/O Priority '{iopriority}' of process {pid}: {stdErr1}. Trying again as root: {cmdOut?.StdErr}");
         }
-        
-        
+
+
 
         static Int64 Max(params long?[] values)
         {
