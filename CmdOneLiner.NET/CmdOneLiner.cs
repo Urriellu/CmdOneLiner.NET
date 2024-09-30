@@ -200,8 +200,9 @@ namespace CmdOneLinerNET
                 {
                     try { p.Kill(); }
                     catch { }
-
-                    return new(-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + $"Process timed out ({timeout?.TotalMinutes} minutes).", maxmem, upt, tpt, runningFor.Elapsed);
+                    CmdResult r = new(-1, false, stdout.ToString(), stderr.ToString() + Environment.NewLine + $"Process timed out ({timeout?.TotalMinutes} minutes).", maxmem, upt, tpt, runningFor.Elapsed);
+                    if(throwOnFail) throw new TimeoutException(r.ToString());
+                    else return r;
                 }
             }
             finally { cancelTokenRegistration?.Dispose(); }
