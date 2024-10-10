@@ -25,7 +25,7 @@ namespace CmdOneLinerNET
         /// <param name="ignoreStatistics">Statistics are not calculated for this process (recommended to set to false when executing fast commands very often).</param>
         /// <param name="throwOnFail">Throw an exception when process exits with an error. If false, no exception is thrown but <see cref="CmdResult.Success"/> will be false.</param>
         /// <param name="realTimeOutput">Print out to the standard output and standard error messages as they come.</param>
-        public static CmdResult Run(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false)
+        public static CmdResult Run(string cmd, string workingDir = null, TimeSpan? timeout = null, CancellationToken? cancelToken = null, ProcessPriorityClass priority = ProcessPriorityClass.Normal, IOPriorityClass ioPriority = IOPriorityClass.L02_NormalEffort, string stdIn = null, bool ignoreStatistics = false, bool throwOnFail = false, bool realTimeOutput = false, bool useShellExecute = false)
         {
             using Process p = new();
             p.StartInfo.CreateNoWindow = true;
@@ -38,7 +38,7 @@ namespace CmdOneLinerNET
             }
 
             if (cmd.Length > p.StartInfo.FileName.Length + 1) p.StartInfo.Arguments = cmd[(p.StartInfo.FileName.Length + 1)..];
-            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.UseShellExecute = useShellExecute;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
 
