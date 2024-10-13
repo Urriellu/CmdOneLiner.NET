@@ -200,7 +200,7 @@ namespace CmdOneLinerNET
                             try
                             {
                                 CmdResult r = new(p.ExitCode, p.ExitCode == 0, stdout.ToString(), stderr.ToString(), maxmem, upt, tpt, runningFor.Elapsed);
-                                if (p.ExitCode != 0 && throwOnFail) throw new Exception(r.ToString());
+                                if (p.ExitCode != 0 && throwOnFail) throw new Exception($"Process '{cmd}' failed: {r}");
                                 return r;
                             }
                             catch (InvalidOperationException ex)
